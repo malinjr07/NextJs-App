@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky install",
-    "commit": "git-cz"
+    "commit": "git-cz",
+    "commitlint": "commitlint --edit"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.7",
@@ -39,10 +40,5 @@
     "prettier-plugin-tailwindcss": "^0.6.11",
     "typescript": "^5"
   },
-  "packageManager": "yarn@4.9.1",
-  "config": {
-    "commitizen": {
-      "path": "./node_modules/cz-conventional-changelog"
-    }
-  }
+  "packageManager": "yarn@4.9.1"
 }
