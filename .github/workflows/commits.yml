@@ -26,7 +26,7 @@ jobs:
           cache: 'yarn'
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
 
       - name: Validate commit messages
         run: |
@@ -39,8 +39,9 @@ jobs:
             COMMIT_RANGE="${{ github.event.before }}"^"...${{ github.event.after }}"
           fi
 
-          # Get commit messages and validate them
-          git log --pretty=format:"%s" $COMMIT_RANGE | while read -r msg; do
+          # Get commit hashes and validate each commit message
+          git log --pretty=format:"%H" $COMMIT_RANGE | while read -r commit_hash; do
+            msg=$(git show -s --format=%B $commit_hash)
             echo "Validating: $msg"
             echo "$msg" | yarn commitlint
           done
