@@ -1,10 +1,11 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Image from 'next/image';
+import styles from './page.module.css';
+import { NextPage } from 'next';
 
-export default function Home() {
+const Home: NextPage = () => {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <main className="rounded bg-blue-500 px-4 py-2 text-base text-white">
         <Image
           className={styles.logo}
           src="/next.svg"
@@ -92,4 +93,6 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+};
+
+export default Home;
