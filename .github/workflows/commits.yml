@@ -1,0 +1,46 @@
+name: Commit Message Validation
+
+on:
+  push:
+    branches: ~
+  pull_request:
+    branches: ~
+
+jobs:
+  validate-commit-msg:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['20.x'] # LTS and latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Validate commit messages
+        run: |
+          # Get the range of commits for PR or push
+          if [ -n "${{ github.event.pull_request }}" ]; then
+            # For PRs, check all commits in the PR
+            COMMIT_RANGE="${{ github.event.pull_request.base.sha }}"^"...${{ github.event.pull_request.head.sha }}"
+          else
+            # For pushes, check only the new commits
+            COMMIT_RANGE="${{ github.event.before }}"^"...${{ github.event.after }}"
+          fi
+
+          # Get commit messages and validate them
+          git log --pretty=format:"%s" $COMMIT_RANGE | while read -r msg; do
+            echo "Validating: $msg"
+            echo "$msg" | yarn commitlint
+          done
