@@ -43,5 +43,5 @@ jobs:
           git log --pretty=format:"%H" $COMMIT_RANGE | while read -r commit_hash; do
             msg=$(git show -s --format=%B $commit_hash)
             echo "Validating: $msg"
-            echo "$msg" | yarn commitlint
+            echo "$msg" | npx commitlint --verbose
           done
