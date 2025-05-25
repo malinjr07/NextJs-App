@@ -26,10 +26,10 @@ jobs:
           cache: 'yarn'
 
       - name: Install dependencies
-        run: |
-          yarn install --immutable
-          # Ensure commitlint and its config are installed
-          yarn add -D @commitlint/cli @commitlint/config-conventional
+        run: yarn install --immutable
+
+      - name: Install commitlint
+        run: yarn add -D @commitlint/cli @commitlint/config-conventional
 
       - name: Validate commit messages
         run: |
