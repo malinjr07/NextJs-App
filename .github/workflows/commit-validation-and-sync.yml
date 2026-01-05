@@ -1,0 +1,380 @@
+name: Commit Validation and Template Sync
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+env:
+  # Template repository configuration
+  TEMPLATE_REPO: malinjr07/nextjs-app-template
+  TEMPLATE_REPO_URL: https://github.com/malinjr07/nextjs-app-template.git
+
+jobs:
+  validate-commit-msg:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['24.x'] # LTS and latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Install commitlint
+        run: yarn add -D @commitlint/cli @commitlint/config-conventional
+
+      - name: Validate commit messages
+        run: |
+          # Get the range of commits for PR or push
+          if [ -n "${{ github.event.pull_request }}" ]; then
+            # For PRs, check all commits in the PR
+            COMMIT_RANGE="${{ github.event.pull_request.base.sha }}"^"...${{ github.event.pull_request.head.sha }}"
+          else
+            # For pushes, check only the new commits
+            COMMIT_RANGE="${{ github.event.before }}"^"...${{ github.event.after }}"
+          fi
+
+          # Get commit hashes and validate each commit message
+          git log --pretty=format:"%H" $COMMIT_RANGE | while read -r commit_hash; do
+            msg=$(git show -s --format=%B $commit_hash)
+            echo "Validating: $msg"
+            echo "$msg" | npx commitlint --verbose
+          done
+
+  check-source-repository:
+    name: Check if Source is Template Repository
+    runs-on: ubuntu-latest
+    needs: validate-commit-msg
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+      is-template-repo: ${{ steps.check.outputs.is-template-repo }}
+
+    steps:
+      - name: Check if this is the template repository
+        id: check
+        run: |
+          echo "Current repository: ${{ github.repository }}"
+          echo "Template repository: ${{ env.TEMPLATE_REPO }}"
+
+          if [ "${{ github.repository }}" = "${{ env.TEMPLATE_REPO }}" ]; then
+            echo "is-template-repo=true" >> $GITHUB_OUTPUT
+            echo "should-run=false" >> $GITHUB_OUTPUT
+            echo "🚫 This is the template repository. Skipping sync workflow."
+          else
+            echo "is-template-repo=false" >> $GITHUB_OUTPUT
+            echo "should-run=true" >> $GITHUB_OUTPUT
+            echo "✅ This is not the template repository. Proceeding with sync workflow."
+          fi
+
+  detect-changes:
+    name: Detect Changes in .windsurf and .rag-docs
+    runs-on: ubuntu-latest
+    needs: [validate-commit-msg, check-source-repository]
+    if: needs.check-source-repository.outputs.should-run == 'true'
+    outputs:
+      windsurf-changed: ${{ steps.changes.outputs.windsurf }}
+      rag-docs-changed: ${{ steps.changes.outputs.rag-docs }}
+      has-changes: ${{ steps.changes.outputs.any-changed }}
+      source-repo: ${{ steps.source.outputs.repo }}
+      commit-sha: ${{ steps.source.outputs.sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for change detection
+
+      - name: Detect changes
+        id: changes
+        run: |
+          # Get the list of changed files in the latest commit
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, compare base with head
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          else
+            # For pushes, compare with previous commit
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
+          fi
+
+          echo "Changed files: $CHANGED_FILES"
+
+          # Check if .windsurf directory has changes
+          if echo "$CHANGED_FILES" | grep -E "^\.windsurf/"; then
+            echo "windsurf=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected in .windsurf directory"
+          else
+            echo "windsurf=false" >> $GITHUB_OUTPUT
+            echo "❌ No changes in .windsurf directory"
+          fi
+
+          # Check if .rag-docs directory has changes
+          if echo "$CHANGED_FILES" | grep -E "^\.rag-docs/"; then
+            echo "rag-docs=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected in .rag-docs directory"
+          else
+            echo "rag-docs=false" >> $GITHUB_OUTPUT
+            echo "❌ No changes in .rag-docs directory"
+          fi
+
+          # Check if any of the target directories changed
+          if echo "$CHANGED_FILES" | grep -E "^(\.windsurf/|\.rag-docs/)"; then
+            echo "any-changed=true" >> $GITHUB_OUTPUT
+            echo "🎯 Target directories have changes!"
+          else
+            echo "any-changed=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes in target directories"
+          fi
+
+      - name: Get source repository info
+        id: source
+        run: |
+          # Get the repository name and commit SHA
+          echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "Source repository: ${{ github.repository }}"
+          echo "Commit SHA: ${{ github.sha }}"
+
+  sync-to-template:
+    name: Sync Changes to Template Repository
+    runs-on: ubuntu-latest
+    needs: [validate-commit-msg, check-source-repository, detect-changes]
+    if: needs.check-source-repository.outputs.should-run == 'true' && needs.detect-changes.outputs.has-changes == 'true'
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          path: source-repo
+
+      - name: Checkout template repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.TEMPLATE_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          repository: ${{ env.TEMPLATE_REPO }}
+          fetch-depth: 0
+          path: template-repo
+
+      - name: Setup Git
+        run: |
+          git config --global user.name 'Template Sync Bot'
+          git config --global user.email 'template-sync@users.noreply.github.com'
+
+      - name: Extract repository name for branch
+        id: repo-name
+        run: |
+          # Extract repository name from full repo path (owner/repo-name)
+          REPO_NAME=$(echo "${{ needs.detect-changes.outputs.source-repo }}" | cut -d'/' -f2)
+          # Sanitize branch name (remove special characters, convert to lowercase)
+          BRANCH_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "Repository name: $REPO_NAME"
+          echo "Branch name: $BRANCH_NAME"
+
+      - name: Create feature branch in template repo
+        run: |
+          cd template-repo
+          BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
+          echo "🌿 Creating branch: $BRANCH_NAME in template repository"
+
+          # Create and switch to new branch
+          git checkout -b "$BRANCH_NAME"
+          echo "✅ Branch $BRANCH_NAME created and switched successfully"
+
+      - name: Copy changed files to template repo
+        run: |
+          echo "📁 Copying changed files to template repository..."
+
+          # Copy .windsurf changes if any
+          if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
+            echo "📋 Copying .windsurf directory..."
+            cp -r source-repo/.windsurf/* template-repo/.windsurf/
+            echo "✅ .windsurf directory copied"
+          fi
+
+          # Copy .rag-docs changes if any
+          if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
+            echo "📋 Copying .rag-docs directory..."
+            cp -r source-repo/.rag-docs/* template-repo/.rag-docs/
+            echo "✅ .rag-docs directory copied"
+          fi
+
+      - name: Create changes summary
+        id: summary
+        run: |
+          SUMMARY="feat: Sync changes from ${{ needs.detect-changes.outputs.source-repo }}\n\n"
+          SUMMARY+="Changes detected in:\n"
+
+          if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
+            SUMMARY+="- ✅ .windsurf/ directory\n"
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
+            SUMMARY+="- ✅ .rag-docs/ directory\n"
+          fi
+
+          SUMMARY+="\nSource commit: ${{ needs.detect-changes.outputs.commit-sha }}\n"
+          SUMMARY+="Sync date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
+
+          # Save summary to file for later use
+          echo -e "$SUMMARY" > /tmp/commit_message.txt
+          echo "Summary created:"
+          cat /tmp/commit_message.txt
+
+      - name: Stage and commit changes in template repo
+        run: |
+          cd template-repo
+          echo "🔍 Checking for changes to commit..."
+
+          # Stage only the target directories
+          if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
+            echo "📁 Staging .windsurf directory..."
+            git add .windsurf/
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
+            echo "📁 Staging .rag-docs directory..."
+            git add .rag-docs/
+          fi
+
+          # Check if there are staged changes
+          if git diff --cached --quiet; then
+            echo "❌ No staged changes found. Skipping commit."
+            exit 0
+          fi
+
+          echo "✅ Changes staged successfully"
+          git status
+
+      - name: Commit changes in template repo
+        run: |
+          cd template-repo
+          # Create commit with the prepared message
+          git commit -F /tmp/commit_message.txt
+          echo "✅ Changes committed successfully in template repository"
+
+      - name: Push branch to template repository
+        run: |
+          cd template-repo
+          BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
+          echo "🚀 Pushing branch $BRANCH_NAME to template repository..."
+          git push origin "$BRANCH_NAME"
+          echo "✅ Branch pushed successfully to template repository"
+
+      - name: Create Pull Request in template repo
+        run: |
+          cd template-repo
+          BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
+
+          # Get default branch of template repo
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+          echo "🔗 Creating Pull Request in template repository..."
+          echo "Source branch: $BRANCH_NAME"
+          echo "Base branch: $DEFAULT_BRANCH"
+
+          # Create PR title and body
+          PR_TITLE="feat: Sync changes from ${{ needs.detect-changes.outputs.source-repo }}"
+          PR_BODY="## 🔄 Template Sync Request\n\n"
+          PR_BODY+="This PR contains changes synced from `${{ needs.detect-changes.outputs.source-repo }}`\n\n"
+          PR_BODY+="**Source Details:**\n"
+          PR_BODY+="- Repository: ${{ needs.detect-changes.outputs.source-repo }}\n"
+          PR_BODY+="- Commit: ${{ needs.detect-changes.outputs.commit-sha }}\n"
+          PR_BODY+="- Sync Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n\n"
+          PR_BODY+="**Changes Included:**\n"
+
+          if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
+            PR_BODY+="- ✅ .windsurf/ directory updates\n"
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
+            PR_BODY+="- ✅ .rag-docs/ directory updates\n"
+          fi
+
+          PR_BODY+="\n---\n\n"
+          PR_BODY+="*This PR was automatically created by the Template Sync workflow.*"
+
+          # Save PR content to file
+          echo "$PR_TITLE" > /tmp/pr_title.txt
+          echo "$PR_BODY" > /tmp/pr_body.txt
+
+          echo "PR Title: $(cat /tmp/pr_title.txt)"
+          echo "PR Body:"
+          cat /tmp/pr_body.txt
+
+      - name: Create PR using GitHub CLI in template repo
+        run: |
+          cd template-repo
+          BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
+
+          # Get default branch of template repo
+          DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+
+          # Set GitHub CLI to work with template repo
+          gh repo set-default ${{ env.TEMPLATE_REPO }}
+
+          # Check if PR already exists
+          PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --base "$DEFAULT_BRANCH" --json number --jq 'length')
+
+          if [ "$PR_EXISTS" -eq 0 ]; then
+            echo "📝 Creating new Pull Request in template repository..."
+            gh pr create \
+              --title "$(cat /tmp/pr_title.txt)" \
+              --body "$(cat /tmp/pr_body.txt)" \
+              --head "$BRANCH_NAME" \
+              --base "$DEFAULT_BRANCH" \
+              --label "template-sync" \
+              --label "automated-pr"
+            echo "✅ Pull Request created successfully in template repository"
+          else
+            echo "ℹ️ Pull Request already exists for branch $BRANCH_NAME in template repository"
+            echo "🔄 Updating existing Pull Request..."
+            gh pr edit "$BRANCH_NAME" \
+              --title "$(cat /tmp/pr_title.txt)" \
+              --body "$(cat /tmp/pr_body.txt)"
+            echo "✅ Pull Request updated successfully in template repository"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.TEMPLATE_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+
+  no-changes:
+    name: No Changes Detected
+    runs-on: ubuntu-latest
+    needs: [validate-commit-msg, check-source-repository, detect-changes]
+    if: needs.check-source-repository.outputs.should-run == 'true' && needs.detect-changes.outputs.has-changes == 'false'
+
+    steps:
+      - name: Skip sync
+        run: |
+          echo "ℹ️ No changes detected in .windsurf or .rag-docs directories"
+          echo "🚫 Skipping template sync process"
+          echo "📋 Summary:"
+          echo "  - .windsurf changed: ${{ needs.detect-changes.outputs.windsurf-changed }}"
+          echo "  - .rag-docs changed: ${{ needs.detect-changes.outputs.rag-docs-changed }}"
+
+  commit-validation-failed:
+    name: Commit Validation Failed
+    runs-on: ubuntu-latest
+    needs: validate-commit-msg
+    if: failure() && needs.validate-commit-msg.result == 'failure'
+
+    steps:
+      - name: Commit validation failed
+        run: |
+          echo "❌ Commit message validation failed!"
+          echo "🚫 Template sync workflow will not run due to commit validation failure."
+          echo "📝 Please ensure your commit messages follow the conventional commit format."
+          echo "📖 Learn more: https://www.conventionalcommits.org/"

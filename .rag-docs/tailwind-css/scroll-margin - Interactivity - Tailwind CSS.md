@@ -1,0 +1,73 @@
+Utilities for controlling the scroll offset around items in a snap container.
+
+## [Examples](https://tailwindcss.com/docs/scroll-margin#examples)
+
+### [Basic example](https://tailwindcss.com/docs/scroll-margin#basic-example)
+
+Use the `scroll-mt-<number>`, `scroll-mr-<number>`, `scroll-mb-<number>`, and `scroll-ml-<number>` utilities like `scroll-ml-4` and `scroll-mt-6` to set the scroll offset around items within a snap container:
+
+Scroll in the grid of images to see the expected behavior
+
+```php-template
+<div class="snap-x ...">  <div class="snap-start scroll-ml-6 ...">    <img src="/img/vacation-01.jpg"/>  </div>  <div class="snap-start scroll-ml-6 ...">    <img src="/img/vacation-02.jpg"/>  </div>  <div class="snap-start scroll-ml-6 ...">    <img src="/img/vacation-03.jpg"/>  </div>  <div class="snap-start scroll-ml-6 ...">    <img src="/img/vacation-04.jpg"/>  </div>  <div class="snap-start scroll-ml-6 ...">    <img src="/img/vacation-05.jpg"/>  </div></div>
+```
+
+### [Using negative values](https://tailwindcss.com/docs/scroll-margin#using-negative-values)
+
+To use a negative scroll margin value, prefix the class name with a dash to convert it to a negative value:
+
+```php-template
+<div class="snap-start -scroll-ml-6 ...">  <!-- ... --></div>
+```
+
+### [Using logical properties](https://tailwindcss.com/docs/scroll-margin#using-logical-properties)
+
+Use the `scroll-ms-<number>` and `scroll-me-<number>` utilities to set the `scroll-margin-inline-start` and `scroll-margin-inline-end` [logical properties](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Logical_Properties/Basic_concepts), which map to either the left or right side based on the text direction:
+
+Scroll in the grid of images to see the expected behavior
+
+Left-to-right
+
+Right-to-left
+
+```php-template
+<div dir="ltr">  <div class="snap-x ...">    <div class="snap-start scroll-ms-6 ...">      <img src="/img/vacation-01.jpg"/>    </div>    <!-- ... -->  </div></div><div dir="rtl">  <div class="snap-x ...">    <div class="snap-start scroll-ms-6 ...">      <img src="/img/vacation-01.jpg"/>    </div>    <!-- ... -->  </div></div>
+```
+
+For more control, you can also use the [LTR and RTL modifiers](https://tailwindcss.com/docs/hover-focus-and-other-states#rtl-support) to conditionally apply specific styles depending on the current text direction.
+
+### [Using a custom value](https://tailwindcss.com/docs/scroll-margin#using-a-custom-value)
+
+Use utilities like `scroll-ml-[<value>]` and `scroll-me-[<value>]` to set the scroll margin based on a completely custom value:
+
+```php-template
+<div class="scroll-ml-[24rem] ...">  <!-- ... --></div>
+```
+
+For CSS variables, you can also use the `scroll-ml-(<custom-property>)` syntax:
+
+```php-template
+<div class="scroll-ml-(--my-scroll-margin) ...">  <!-- ... --></div>
+```
+
+This is just a shorthand for `scroll-ml-[var(<custom-property>)]` that adds the `var()` function for you automatically.
+
+### [Responsive design](https://tailwindcss.com/docs/scroll-margin#responsive-design)
+
+Prefix a `scroll-margin` utility with a breakpoint variant like `md:` to only apply the utility at medium screen sizes and above:
+
+```php-template
+<div class="scroll-m-8 md:scroll-m-0 ...">  <!-- ... --></div>
+```
+
+Learn more about using variants in the [variants documentation](https://tailwindcss.com/docs/hover-focus-and-other-states).
+
+## [Customizing your theme](https://tailwindcss.com/docs/scroll-margin#customizing-your-theme)
+
+The `scroll-m-<number>`,`scroll-mx-<number>`,`scroll-my-<number>`,`scroll-ms-<number>`,`scroll-me-<number>`,`scroll-mt-<number>`,`scroll-mr-<number>`,`scroll-mb-<number>`, and `scroll-ml-<number>` utilities are driven by the `--spacing` theme variable, which can be customized in your own theme:
+
+```css
+@theme {  --spacing: 1px; }
+```
+
+Learn more about customizing the spacing scale in the [theme variable documentation](https://tailwindcss.com/docs/theme).
