@@ -2,9 +2,9 @@ name: Commit Validation and Template Sync
 
 on:
   push:
-    branches: ~
+    branches: ["main", "master"]
   pull_request:
-    branches: ~
+    branches: ["main", "master"]
 
 # Add this permissions block at the top level
 permissions:
