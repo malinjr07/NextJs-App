@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ~
 
+# Add this permissions block at the top level
+permissions:
+  contents: write
+
 env:
   # Template repository configuration
   TEMPLATE_REPO: malinjr07/nextjs-app-template
@@ -50,8 +54,8 @@ jobs:
           # Get commit hashes and validate each commit message
           git log --pretty=format:"%H" $COMMIT_RANGE | while read -r commit_hash; do
             msg=$(git show -s --format=%B $commit_hash)
-            echo "Validating: $msg"
-            echo "$msg" | npx commitlint --verbose
+            echo -e "Validating: $msg"
+            echo -e "$msg" | npx commitlint --verbose
           done
 
   check-source-repository:
@@ -66,17 +70,17 @@ jobs:
       - name: Check if this is the template repository
         id: check
         run: |
-          echo "Current repository: ${{ github.repository }}"
-          echo "Template repository: ${{ env.TEMPLATE_REPO }}"
+          echo -e "Current repository: ${{ github.repository }}"
+          echo -e "Template repository: ${{ env.TEMPLATE_REPO }}"
 
           if [ "${{ github.repository }}" = "${{ env.TEMPLATE_REPO }}" ]; then
-            echo "is-template-repo=true" >> $GITHUB_OUTPUT
-            echo "should-run=false" >> $GITHUB_OUTPUT
-            echo "🚫 This is the template repository. Skipping sync workflow."
+            echo -e "is-template-repo=true" >> $GITHUB_OUTPUT
+            echo -e "should-run=false" >> $GITHUB_OUTPUT
+            echo -e "🚫 This is the template repository. Skipping sync workflow."
           else
-            echo "is-template-repo=false" >> $GITHUB_OUTPUT
-            echo "should-run=true" >> $GITHUB_OUTPUT
-            echo "✅ This is not the template repository. Proceeding with sync workflow."
+            echo -e "is-template-repo=false" >> $GITHUB_OUTPUT
+            echo -e "should-run=true" >> $GITHUB_OUTPUT
+            echo -e "✅ This is not the template repository. Proceeding with sync workflow."
           fi
 
   detect-changes:
@@ -109,43 +113,43 @@ jobs:
             CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }})
           fi
 
-          echo "Changed files: $CHANGED_FILES"
+          echo -e "Changed files: $CHANGED_FILES"
 
           # Check if .windsurf directory has changes
-          if echo "$CHANGED_FILES" | grep -E "^\.windsurf/"; then
-            echo "windsurf=true" >> $GITHUB_OUTPUT
-            echo "✅ Changes detected in .windsurf directory"
+          if echo -e "$CHANGED_FILES" | grep -E "^\.windsurf/"; then
+            echo -e "windsurf=true" >> $GITHUB_OUTPUT
+            echo -e "✅ Changes detected in .windsurf directory"
           else
-            echo "windsurf=false" >> $GITHUB_OUTPUT
-            echo "❌ No changes in .windsurf directory"
+            echo -e "windsurf=false" >> $GITHUB_OUTPUT
+            echo -e "❌ No changes in .windsurf directory"
           fi
 
           # Check if .rag-docs directory has changes
-          if echo "$CHANGED_FILES" | grep -E "^\.rag-docs/"; then
-            echo "rag-docs=true" >> $GITHUB_OUTPUT
-            echo "✅ Changes detected in .rag-docs directory"
+          if echo -e "$CHANGED_FILES" | grep -E "^\.rag-docs/"; then
+            echo -e "rag-docs=true" >> $GITHUB_OUTPUT
+            echo -e "✅ Changes detected in .rag-docs directory"
           else
-            echo "rag-docs=false" >> $GITHUB_OUTPUT
-            echo "❌ No changes in .rag-docs directory"
+            echo -e "rag-docs=false" >> $GITHUB_OUTPUT
+            echo -e "❌ No changes in .rag-docs directory"
           fi
 
           # Check if any of the target directories changed
-          if echo "$CHANGED_FILES" | grep -E "^(\.windsurf/|\.rag-docs/)"; then
-            echo "any-changed=true" >> $GITHUB_OUTPUT
-            echo "🎯 Target directories have changes!"
+          if echo -e "$CHANGED_FILES" | grep -E "^(\.windsurf/|\.rag-docs/)"; then
+            echo -e "any-changed=true" >> $GITHUB_OUTPUT
+            echo -e "🎯 Target directories have changes!"
           else
-            echo "any-changed=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No changes in target directories"
+            echo -e "any-changed=false" >> $GITHUB_OUTPUT
+            echo -e "ℹ️ No changes in target directories"
           fi
 
       - name: Get source repository info
         id: source
         run: |
           # Get the repository name and commit SHA
-          echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
-          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          echo "Source repository: ${{ github.repository }}"
-          echo "Commit SHA: ${{ github.sha }}"
+          echo -e "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+          echo -e "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo -e "Source repository: ${{ github.repository }}"
+          echo -e "Commit SHA: ${{ github.sha }}"
 
   sync-to-template:
     name: Sync Changes to Template Repository
@@ -178,39 +182,39 @@ jobs:
         id: repo-name
         run: |
           # Extract repository name from full repo path (owner/repo-name)
-          REPO_NAME=$(echo "${{ needs.detect-changes.outputs.source-repo }}" | cut -d'/' -f2)
+          REPO_NAME=$(echo -e "${{ needs.detect-changes.outputs.source-repo }}" | cut -d'/' -f2)
           # Sanitize branch name (remove special characters, convert to lowercase)
-          BRANCH_NAME=$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Repository name: $REPO_NAME"
-          echo "Branch name: $BRANCH_NAME"
+          BRANCH_NAME=$(echo -e "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+          echo -e "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo -e "Repository name: $REPO_NAME"
+          echo -e "Branch name: $BRANCH_NAME"
 
       - name: Create feature branch in template repo
         run: |
           cd template-repo
           BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
-          echo "🌿 Creating branch: $BRANCH_NAME in template repository"
+          echo -e "🌿 Creating branch: $BRANCH_NAME in template repository"
 
           # Create and switch to new branch
           git checkout -b "$BRANCH_NAME"
-          echo "✅ Branch $BRANCH_NAME created and switched successfully"
+          echo -e "✅ Branch $BRANCH_NAME created and switched successfully"
 
       - name: Copy changed files to template repo
         run: |
-          echo "📁 Copying changed files to template repository..."
+          echo -e "📁 Copying changed files to template repository..."
 
           # Copy .windsurf changes if any
           if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
-            echo "📋 Copying .windsurf directory..."
+            echo -e "📋 Copying .windsurf directory..."
             cp -r source-repo/.windsurf/* template-repo/.windsurf/
-            echo "✅ .windsurf directory copied"
+            echo -e "✅ .windsurf directory copied"
           fi
 
           # Copy .rag-docs changes if any
           if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
-            echo "📋 Copying .rag-docs directory..."
+            echo -e "📋 Copying .rag-docs directory..."
             cp -r source-repo/.rag-docs/* template-repo/.rag-docs/
-            echo "✅ .rag-docs directory copied"
+            echo -e "✅ .rag-docs directory copied"
           fi
 
       - name: Create changes summary
@@ -227,37 +231,36 @@ jobs:
             SUMMARY+="- ✅ .rag-docs/ directory\n"
           fi
 
-          SUMMARY+="\nSource commit: ${{ needs.detect-changes.outputs.commit-sha }}\n"
           SUMMARY+="Sync date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')\n"
 
           # Save summary to file for later use
           echo -e "$SUMMARY" > /tmp/commit_message.txt
-          echo "Summary created:"
+          echo -e "Summary created:"
           cat /tmp/commit_message.txt
 
       - name: Stage and commit changes in template repo
         run: |
           cd template-repo
-          echo "🔍 Checking for changes to commit..."
+          echo -e "🔍 Checking for changes to commit..."
 
           # Stage only the target directories
           if [ "${{ needs.detect-changes.outputs.windsurf-changed }}" == "true" ]; then
-            echo "📁 Staging .windsurf directory..."
+            echo -e "📁 Staging .windsurf directory..."
             git add .windsurf/
           fi
 
           if [ "${{ needs.detect-changes.outputs.rag-docs-changed }}" == "true" ]; then
-            echo "📁 Staging .rag-docs directory..."
+            echo -e "📁 Staging .rag-docs directory..."
             git add .rag-docs/
           fi
 
           # Check if there are staged changes
           if git diff --cached --quiet; then
-            echo "❌ No staged changes found. Skipping commit."
+            echo -e "❌ No staged changes found. Skipping commit."
             exit 0
           fi
 
-          echo "✅ Changes staged successfully"
+          echo -e "✅ Changes staged successfully"
           git status
 
       - name: Commit changes in template repo
@@ -265,15 +268,15 @@ jobs:
           cd template-repo
           # Create commit with the prepared message
           git commit -F /tmp/commit_message.txt
-          echo "✅ Changes committed successfully in template repository"
+          echo -e "✅ Changes committed successfully in template repository"
 
       - name: Push branch to template repository
         run: |
           cd template-repo
           BRANCH_NAME="${{ steps.repo-name.outputs.branch-name }}"
-          echo "🚀 Pushing branch $BRANCH_NAME to template repository..."
+          echo -e "🚀 Pushing branch $BRANCH_NAME to template repository..."
           git push origin "$BRANCH_NAME"
-          echo "✅ Branch pushed successfully to template repository"
+          echo -e "✅ Branch pushed successfully to template repository"
 
       - name: Create Pull Request in template repo
         run: |
@@ -282,14 +285,14 @@ jobs:
 
           # Get default branch of template repo
           DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
-          echo "🔗 Creating Pull Request in template repository..."
-          echo "Source branch: $BRANCH_NAME"
-          echo "Base branch: $DEFAULT_BRANCH"
+          echo -e "🔗 Creating Pull Request in template repository..."
+          echo -e "Source branch: $BRANCH_NAME"
+          echo -e "Base branch: $DEFAULT_BRANCH"
 
           # Create PR title and body
           PR_TITLE="feat: Sync changes from ${{ needs.detect-changes.outputs.source-repo }}"
           PR_BODY="## 🔄 Template Sync Request\n\n"
-          PR_BODY+="This PR contains changes synced from `${{ needs.detect-changes.outputs.source-repo }}`\n\n"
+          PR_BODY+="This PR contains changes synced from ${{ needs.detect-changes.outputs.source-repo }}\n\n"
           PR_BODY+="**Source Details:**\n"
           PR_BODY+="- Repository: ${{ needs.detect-changes.outputs.source-repo }}\n"
           PR_BODY+="- Commit: ${{ needs.detect-changes.outputs.commit-sha }}\n"
@@ -308,11 +311,11 @@ jobs:
           PR_BODY+="*This PR was automatically created by the Template Sync workflow.*"
 
           # Save PR content to file
-          echo "$PR_TITLE" > /tmp/pr_title.txt
-          echo "$PR_BODY" > /tmp/pr_body.txt
+          echo -e "$PR_TITLE" > /tmp/pr_title.txt
+          echo -e "$PR_BODY" > /tmp/pr_body.txt
 
-          echo "PR Title: $(cat /tmp/pr_title.txt)"
-          echo "PR Body:"
+          echo -e "PR Title: $(cat /tmp/pr_title.txt)"
+          echo -e "PR Body:"
           cat /tmp/pr_body.txt
 
       - name: Create PR using GitHub CLI in template repo
@@ -330,22 +333,20 @@ jobs:
           PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --base "$DEFAULT_BRANCH" --json number --jq 'length')
 
           if [ "$PR_EXISTS" -eq 0 ]; then
-            echo "📝 Creating new Pull Request in template repository..."
+            echo -e "📝 Creating new Pull Request in template repository..."
             gh pr create \
               --title "$(cat /tmp/pr_title.txt)" \
               --body "$(cat /tmp/pr_body.txt)" \
               --head "$BRANCH_NAME" \
-              --base "$DEFAULT_BRANCH" \
-              --label "template-sync" \
-              --label "automated-pr"
-            echo "✅ Pull Request created successfully in template repository"
+              --base "$DEFAULT_BRANCH"
+            echo -e "✅ Pull Request created successfully in template repository"
           else
-            echo "ℹ️ Pull Request already exists for branch $BRANCH_NAME in template repository"
-            echo "🔄 Updating existing Pull Request..."
+            echo -e "ℹ️ Pull Request already exists for branch $BRANCH_NAME in template repository"
+            echo -e "🔄 Updating existing Pull Request..."
             gh pr edit "$BRANCH_NAME" \
               --title "$(cat /tmp/pr_title.txt)" \
               --body "$(cat /tmp/pr_body.txt)"
-            echo "✅ Pull Request updated successfully in template repository"
+            echo -e "✅ Pull Request updated successfully in template repository"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.TEMPLATE_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
@@ -359,11 +360,11 @@ jobs:
     steps:
       - name: Skip sync
         run: |
-          echo "ℹ️ No changes detected in .windsurf or .rag-docs directories"
-          echo "🚫 Skipping template sync process"
-          echo "📋 Summary:"
-          echo "  - .windsurf changed: ${{ needs.detect-changes.outputs.windsurf-changed }}"
-          echo "  - .rag-docs changed: ${{ needs.detect-changes.outputs.rag-docs-changed }}"
+          echo -e "ℹ️ No changes detected in .windsurf or .rag-docs directories"
+          echo -e "🚫 Skipping template sync process"
+          echo -e "📋 Summary:"
+          echo -e "  - .windsurf changed: ${{ needs.detect-changes.outputs.windsurf-changed }}"
+          echo -e "  - .rag-docs changed: ${{ needs.detect-changes.outputs.rag-docs-changed }}"
 
   commit-validation-failed:
     name: Commit Validation Failed
@@ -374,7 +375,7 @@ jobs:
     steps:
       - name: Commit validation failed
         run: |
-          echo "❌ Commit message validation failed!"
-          echo "🚫 Template sync workflow will not run due to commit validation failure."
-          echo "📝 Please ensure your commit messages follow the conventional commit format."
-          echo "📖 Learn more: https://www.conventionalcommits.org/"
+          echo -e "❌ Commit message validation failed!"
+          echo -e "🚫 Template sync workflow will not run due to commit validation failure."
+          echo -e "📝 Please ensure your commit messages follow the conventional commit format."
+          echo -e "📖 Learn more: https://www.conventionalcommits.org/"
