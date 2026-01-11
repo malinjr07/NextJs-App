@@ -2,9 +2,9 @@ name: Commit Validation and Template Sync
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: ~
   pull_request:
-    branches: [main, master, develop]
+    branches: ~
 
 env:
   # Template repository configuration
